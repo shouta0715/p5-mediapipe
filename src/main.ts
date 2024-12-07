@@ -95,7 +95,6 @@ const sketch = (_p: p5) => {
 
     p.push();
 
-    // テストとして取得したsegmentMaskを小さく表示
     if (segmentMask && segmentImage) {
       p.image(segmentMask, 0, 0, width, height);
     }

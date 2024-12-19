@@ -8,6 +8,7 @@ import {
 
 let lastWebcamTime = -1;
 let segmentMask: p5.Image | null = null;
+let previousMask: p5.Image | null = null;
 
 const width = window.innerWidth;
 const height = window.innerHeight;
@@ -33,40 +34,70 @@ let p: p5;
 const callbackForVideo: ImageSegmenterCallback = (
   result: ImageSegmenterResult
 ) => {
-  // TODO: 画像に変換する。
+  if (!result.categoryMask) return;
+  const maskResult = result.categoryMask;
+
+  const mask: Float32Array = maskResult.getAsFloat32Array();
+
+  const pImg = p.createImage(maskResult.width, maskResult.height);
+  pImg.loadPixels();
+
+  for (let y = 0; y < maskResult.height; y++) {
+    for (let x = 0; x < maskResult.width; x++) {
+      const index = y * maskResult.width + x;
+      const pixelIndex = (y * maskResult.width + x) * 4;
+
+      const maskVal = Math.round(mask[index] * 255.0);
+
+      const blendedValue =
+        previousMask && previousMask.pixels[pixelIndex]
+          ? (maskVal + previousMask.pixels[pixelIndex]) / 2
+          : maskVal;
+
+      pImg.pixels[pixelIndex] = blendedValue; // R
+      pImg.pixels[pixelIndex + 1] = blendedValue; // G
+      pImg.pixels[pixelIndex + 2] = blendedValue; // B
+      pImg.pixels[pixelIndex + 3] = 255; // A
+    }
+  }
+
+  pImg.updatePixels();
+
+  previousMask = pImg;
+  segmentMask = pImg;
 };
 
-// p5.jsスケッチ
 const sketch = (_p: p5) => {
   p = _p;
   let imageSegmenter: ImageSegmenter | null = null;
-
   let video: HTMLVideoElement | null = null;
 
-  let videoTime = -1;
   p.setup = async () => {
     p.createCanvas(width, height);
-
     imageSegmenter = await createImageSegmenter();
+
     const cap = p.createCapture('video');
+    cap.size(width, height);
     cap.hide();
     video = cap.elt;
   };
 
-  p.draw = async () => {
-    p.background(255);
-    if (!video) return;
-    if (!imageSegmenter) return;
-    if (!video.videoWidth || !video.videoWidth) return;
-    if (video.currentTime === videoTime) return;
+  p.draw = () => {
+    if (!video || !imageSegmenter || !video.videoWidth || !video.videoHeight)
+      return;
 
+    if (video.currentTime === lastWebcamTime) return;
     lastWebcamTime = video.currentTime;
 
     imageSegmenter.segmentForVideo(video, video.currentTime, callbackForVideo);
-    videoTime = video.currentTime;
 
     if (segmentMask) {
+      p.push();
+      p.translate(p.width, 0);
+
+      p.scale(-1, 1);
       p.image(segmentMask, 0, 0, width, height);
+      p.pop();
     }
   };
 };

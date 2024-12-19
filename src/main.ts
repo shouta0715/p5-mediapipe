@@ -94,7 +94,6 @@ const sketch = (_p: p5) => {
     if (segmentMask) {
       p.push();
       p.translate(p.width, 0);
-
       p.scale(-1, 1);
       p.image(segmentMask, 0, 0, width, height);
       p.pop();
